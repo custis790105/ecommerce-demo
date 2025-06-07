@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ecommerce-demo
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/ecommerce?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
+    username: root
+    password: 8dao20wei
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    show-sql: true
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.example.ecommerce.model
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.example.ecommerce: DEBUG
