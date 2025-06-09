@@ -4,15 +4,8 @@ server:
 spring:
   application:
     name: ecommerce-demo
-
-  datasource:
-    url: jdbc:mysql://localhost:3306/ecommerce?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
-    username: root
-    password: 8dao20wei
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
-  jpa:
-    show-sql: true
+  profiles:
+    active: dev
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -20,6 +13,3 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
-logging:
-  level:
-    com.example.ecommerce: DEBUG
