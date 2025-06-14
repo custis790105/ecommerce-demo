@@ -63,6 +63,8 @@ logging.level.com.example.ecommerce=debug
 
 本项目使用 Druid 作为数据库连接池，替代默认的 HikariCP，便于后续进行 SQL 监控、性能调优等操作。
 
+访问监控控制台:http://localhost:8080/druid
+
 ```xml
 <dependency>
     <groupId>com.alibaba</groupId>
