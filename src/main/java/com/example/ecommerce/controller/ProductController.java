@@ -5,6 +5,7 @@ import com.example.ecommerce.response.Result;
 import com.example.ecommerce.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,5 +25,16 @@ public class ProductController {
     @GetMapping
     public Result<List<Product>> getAllProducts() {
         return Result.success(productService.getAllProducts());
+    }
+
+    @GetMapping("/{id}")
+    public Result<Product> queryProductById(@PathVariable long id) {
+        Product product = productService.queryProductById(id);
+        if (product != null) {
+            return Result.success(product);
+        }
+        else {
+            return Result.failure("Product not found.");
+        }
     }
 }

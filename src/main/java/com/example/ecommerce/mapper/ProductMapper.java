@@ -11,6 +11,8 @@ import java.util.List;
 public interface ProductMapper {
     List<Product> findAll();
 
+    Product findById(@Param("id") Long id);
+
     List<Product> getProductByIdsForUpdate(List<Integer> ids);
 
     void updateStock(@Param("quantity") Integer quantity, @Param("productId") Integer productID);

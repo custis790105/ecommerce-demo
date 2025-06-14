@@ -7,7 +7,11 @@
     <select id="findAll" resultType="com.example.ecommerce.model.Product">
         select * from product
     </select>
-    
+
+    <select id="findById" resultType="com.example.ecommerce.model.Product">
+        select * from product where id = #{id}
+    </select>
+
     <update id="updateStock">
         update product set stock = stock - #{quantity}
         where id = #{productId} and stock >= #{quantity}
