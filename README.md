@@ -59,6 +59,20 @@
 logging.level.com.example.ecommerce=debug
 ```
 
+### ✅ 数据库连接池：Druid 集成说明
+
+本项目使用 Druid 作为数据库连接池，替代默认的 HikariCP，便于后续进行 SQL 监控、性能调优等操作。
+
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid-spring-boot-3-starter</artifactId>
+    <version>1.2.20</version>
+</dependency>
+```
+
+
+
 ## 性能与扩展建议
 
 - 查询库存与下单操作间通过行锁避免并发问题，满足单体架构场景。
