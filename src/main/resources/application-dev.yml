@@ -1,10 +1,30 @@
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/ecommerce?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
-    username: root
-    password: 8dao20wei
+    username: user
+    password: password
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+
+      stat-view-servlet:
+        enabled: true
+        login-username: admin
+        login-password: admin123
+        url-pattern: /druid/*
+
+      web-stat-filter:
+        enabled: true  # 开发环境可以开启，方便调试
 mybatis:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
