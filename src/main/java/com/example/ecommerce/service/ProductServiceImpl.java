@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 
@@ -39,12 +41,44 @@ public class ProductServiceImpl implements ProductService{
             log.info("Product {} found in cache.", id);
             return JSON.parseObject(json, Product.class);
         }
+        else if (json != null) {
+            log.warn("Product {} not found in DB, empty cache hit.",id);
+            return null;
+        }
+
         log.info("Product {} not found in cache, querying database.", id);
 
-        Product product = productMapper.findById(id);
-        if (product != null) {
-            stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(product), 30, TimeUnit.MINUTES);
+        String uniqueValue = UUID.randomUUID().toString();
+        String lockKey = "lock:product:" + id;
+        Boolean success = stringRedisTemplate.opsForValue().setIfAbsent(lockKey,uniqueValue,10,TimeUnit.SECONDS);
+        if (success) {
+            try {
+                log.info("Lock acquired for product {}, querying database.", id);
+                Product product = productMapper.findById(id);
+                if (product != null) {
+                    int ttl = 30 + new Random().nextInt(10);
+                    stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(product), ttl, TimeUnit.MINUTES);
+                } else {
+                    int ttl = 5 + new Random().nextInt(5);
+                    stringRedisTemplate.opsForValue().set(key, "", ttl, TimeUnit.MINUTES);
+                    log.warn("Product {} not found in DB, cache empty placeholder.", id);
+                }
+                return product;
+            }
+            finally {
+                if (uniqueValue.equals(stringRedisTemplate.opsForValue().get(lockKey))) {
+                    stringRedisTemplate.delete(lockKey);
+                }
+            }
         }
-        return product;
+        else {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            log.warn("Failed to acquire lock for product {}, retrying...", id);
+            return queryProductById(id);
+        }
     }
 }

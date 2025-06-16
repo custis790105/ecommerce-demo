@@ -1,132 +1,73 @@
-# Stage 02 - Database Split（应用与数据库分离）
+# stage-03-redis-cache 缓存进阶处理笔记（商品详情）
 
-本阶段目标：将应用与数据库解耦，并通过 Docker 实现本地容器化部署，支持多环境配置和可控的数据库初始化。
-
----
-
-## 目录结构调整
-
-- `src/main/resources`
-  - `application.yml`：主配置入口，声明默认配置文件加载行为
-  - `application-dev.yml`：开发环境配置（本机运行）
-  - `application-prod.yml`：生产配置（容器内运行）
+本阶段主要处理商品详情缓存，并解决以下三类缓存问题：渗透、雪崩、击穿。
 
 ---
 
-## 多环境配置说明
+## 一、缓存渗透
 
-```yaml
-# application.yml（默认激活 dev 环境）
-spring:
-  profiles:
-    active: dev
-```
-
-```yaml
-# application-dev.yml（开发环境）
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/ecommerce
-    username: root
-    password: your-password
-  jpa:
-    show-sql: true
-logging:
-  level:
-    com.example.ecommerce: DEBUG
-```
-
-```yaml
-# application-prod.yml（生产/容器环境）
-spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-```
+- 问题：请求的商品 ID 在数据库中也不存在，缓存也没有，导致不断访问数据库。
+- 解决方案：
+  - 如果数据库查询结果为空，缓存一个空字符串 `""`。
+  - 设置较短 TTL（如 5~10 分钟），防止空缓存长期存在。
+  - 判断逻辑中注意使用：
+    ```java
+    if (json != null && !StringUtils.hasText(json)) {
+        return null;
+    }
+    ```
+- 注意事项：
+  - `StringUtils.hasText(json)` 可以排除 null、""、" " 等无效缓存。
+  - 这比直接判断 `json != null` 更严谨。
 
 ---
 
-## Docker 部署相关
+## 二、缓存雪崩
 
-### Dockerfile 示例
-
-```dockerfile
-FROM eclipse-temurin:17-jdk-alpine
-WORKDIR /app
-COPY . /app
-RUN ./mvnw clean package -DskipTests
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "target/ecommerce-0.0.1-SNAPSHOT.jar"]
-```
-
-### docker-compose.yml 示例
-
-```yaml
-version: "3.8"
-services:
-  db:
-    image: mysql:8
-    container_name: mysql-db
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ecommerce
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    ports:
-      - "3307:3306"
-    volumes:
-      - db-data:/var/lib/mysql
-
-  app:
-    build: .
-    container_name: ecommerce-app
-    depends_on:
-      - db
-    ports:
-      - "8080:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/ecommerce?useSSL=false&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: password
-
-volumes:
-  db-data:
-```
+- 问题：大量缓存 key 设置了相同的 TTL，可能同一时间全部过期，导致数据库压力激增。
+- 解决方案：
+  - 设置 TTL 时加上随机抖动，分散缓存过期时间：
+    ```java
+    int ttl = 30 + new Random().nextInt(10);
+    ```
 
 ---
 
-## 数据库初始化说明
+## 三、缓存击穿
 
-- `schema.sql`：数据库结构文件
-- `data.sql`：初始化数据文件
-- 两者均放置于根目录下的 `mysql-init` 目录中
-- **容器初始化仅执行一次**，如需重新执行需：
-
-```bash
-docker compose down -v   # 删除容器及数据卷
-docker compose build     # 重新构建镜像
-docker compose up        # 启动容器
-```
+- 问题：某个热点 key 在瞬间过期，多个线程同时访问，导致并发打数据库。
+- 解决方案：
+  - 使用 Redis 分布式锁：
+    - 加锁：`setIfAbsent(key, uuid, 10, TimeUnit.SECONDS)`
+    - 释放锁前判断 value 是否一致，防止误删别人加的锁。
+  - 未获取到锁的线程可短暂 sleep 后递归重试。
+  - 示例代码片段：
+    ```java
+    String lockKey = "lock:product:" + id;
+    String uniqueValue = UUID.randomUUID().toString();
+    Boolean success = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, uniqueValue, 10, TimeUnit.SECONDS);
+    if (success) {
+        try {
+            // 查询数据库并写入缓存
+        } finally {
+            if (uniqueValue.equals(stringRedisTemplate.opsForValue().get(lockKey))) {
+                stringRedisTemplate.delete(lockKey);
+            }
+        }
+    } else {
+        Thread.sleep(50);
+        return queryProductById(id);
+    }
+    ```
 
 ---
 
-## 部署注意事项
+## 其他细节记录
 
-- 如仅修改代码逻辑，可跳过 `build` 步骤，直接运行：
-  ```bash
-  docker compose up
-  ```
-- 如果 Docker 容器内数据库不希望暴露给宿主机，删除 `db` 服务中的 `ports` 映射即可
-- 可使用 IDE 连接本地数据库测试，也可访问容器中数据库（通过端口如 3307）
+- Redis Key 命名采用冒号分隔（如：`product:detail:{id}`），模拟命名空间结构。
+- 缓存内容为 JSON 字符串，使用 FastJSON 进行序列化/反序列化。
+- 加锁的 value 推荐使用 UUID，避免误删其他线程加的锁。
+- 分布式锁适用于单机和多节点部署，当前写法考虑了锁误删的问题。
+- 目前未设置最大重试次数，后续如需控制递归调用次数可通过参数累加方式实现。
 
 ---
-
-## 第二阶段成果总结
-
-- Spring Boot 项目支持 dev/prod 多环境切换
-- 应用与数据库以 Docker 容器独立部署
-- 数据库初始化通过 schema.sql 和 data.sql 控制
-- 宿主机可以通过端口访问应用和数据库
-- 支持热部署与快速重启，不影响数据持久化
