@@ -47,7 +47,6 @@ public class ProductServiceImpl implements ProductService{
         }
 
         log.info("Product {} not found in cache, querying database.", id);
-
         String uniqueValue = UUID.randomUUID().toString();
         String lockKey = "lock:product:" + id;
         Boolean success = stringRedisTemplate.opsForValue().setIfAbsent(lockKey,uniqueValue,10,TimeUnit.SECONDS);

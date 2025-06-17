@@ -9,8 +9,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/products")
@@ -23,18 +24,26 @@ public class ProductController {
     }
 
     @GetMapping
-    public Result<List<Product>> getAllProducts() {
-        return Result.success(productService.getAllProducts());
+    public Result<Map<String, Object>> getAllProducts() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("instance", System.getenv("HOSTNAME"));
+        result.put("data", productService.getAllProducts());
+        return Result.success(result);
     }
 
     @GetMapping("/{id}")
     public Result<Product> queryProductById(@PathVariable long id) {
-        Product product = productService.queryProductById(id);
-        if (product != null) {
-            return Result.success(product);
+        try {
+            Product product = productService.queryProductById(id);
+            if (product != null) {
+                return Result.success(product);
+            } else {
+                return Result.failure("Product not found.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();  // 打印堆栈
+            return Result.failure("Internal Error: " + e.getMessage());
         }
-        else {
-            return Result.failure("Product not found.");
-        }
+
     }
 }

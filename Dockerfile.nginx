@@ -1,0 +1,5 @@
+# 使用指定稳定版本的 Nginx 镜像
+FROM nginx:1.24.0
+
+# 拷贝自定义配置文件进镜像
+COPY nginx.conf /etc/nginx/nginx.conf
