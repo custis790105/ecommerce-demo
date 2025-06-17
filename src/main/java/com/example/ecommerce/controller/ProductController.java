@@ -33,16 +33,11 @@ public class ProductController {
 
     @GetMapping("/{id}")
     public Result<Product> queryProductById(@PathVariable long id) {
-        try {
-            Product product = productService.queryProductById(id);
-            if (product != null) {
-                return Result.success(product);
-            } else {
-                return Result.failure("Product not found.");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();  // 打印堆栈
-            return Result.failure("Internal Error: " + e.getMessage());
+        Product product = productService.queryProductById(id);
+        if (product != null) {
+            return Result.success(product);
+        } else {
+            return Result.failure("Product not found.");
         }
 
     }
