@@ -16,12 +16,13 @@ services:
     hostname: app1
     container_name: ecommerce-app-1
     depends_on:
-      - db
+      - mysql-master
+      - mysql-slave
     ports:
       - "8081:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-master:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: user
       SPRING_DATASOURCE_PASSWORD: password
       SPRING_REDIS_HOST: redis
@@ -33,31 +34,18 @@ services:
     hostname: app2
     container_name: ecommerce-app-2
     depends_on:
-      - db
+      - mysql-master
+      - mysql-slave
     ports:
       - "8082:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-slave:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: user
       SPRING_DATASOURCE_PASSWORD: password
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
     restart: unless-stopped
-
-  db:
-    image: mysql:8.0
-    container_name: ecommerce-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ecommerce
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./mysql-init:/docker-entrypoint-initdb.d
 
   redis:
     image: redis:7.2
@@ -66,5 +54,52 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+  mysql-master:
+    image: mysql:8.0
+    container_name: ecommerce-mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_master_data:/var/lib/mysql
+      - ./mysql-init/master:/docker-entrypoint-initdb.d
+    command: >
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
+      --default-authentication-plugin=mysql_native_password
+
+  mysql-slave:
+    image: mysql:8.0
+    container_name: ecommerce-mysql-slave
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3307:3306"
+    depends_on:
+      - mysql-master
+    volumes:
+      - db_slave_data:/var/lib/mysql
+      - ./mysql-init/slave:/docker-entrypoint-initdb.d
+    command: >
+      --server-id=2
+      --relay-log=relay-log
+      --log-bin=mysql-bin
+      --read-only=1
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
+      --default-authentication-plugin=mysql_native_password
+    
+
 volumes:
-  db_data:
+  db_master_data:
+  db_slave_data:

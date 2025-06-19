@@ -1,110 +1,95 @@
-# 第四阶段：Nginx 负载均衡（stage-04-nginx-lb）
+# 第五阶段：MySQL 主从复制总结（stage-05-db-readwrite-split）
 
-本阶段目标是模拟多实例部署，并通过 Nginx 实现请求的负载均衡。
+## 一、目标
 
-## 实现内容
+本阶段目标是通过 MySQL 主从配置，实现数据库的读写分离，为后续分库分表打下基础。
 
-### 1. 多实例部署
+---
 
-- 使用 Docker Compose 启动两个 Spring Boot 应用实例：`app1` 和 `app2`
-- 宿主机分别映射端口 8081 和 8082，容器内部端口仍为 8080
-- 日志中可看到轮询效果，也在接口返回中增加了实例名（hostname）
+## 二、实现方案
 
-### 2. Nginx 配置
+### 1. 架构简述
 
-- 使用稳定版镜像 `nginx:1.24.0`，避免使用 latest 带来的不确定性
-- nginx.conf 配置了 upstream 组：
+- 使用 Docker Compose 启动 `mysql-master` 和 `mysql-slave`
+- `app1` 连接主库，处理写请求
+- `app2` 连接从库，处理读请求
+- 从库通过 `CHANGE MASTER TO` 命令手动配置复制
 
-  ```nginx
-  upstream ecommerce_backend {
-      server app1:8080;
-      server app2:8080;
-  }
+---
+
+## 三、配置细节
+
+### 1. 初始化同步的一致性问题
+
+- 问题：主库通过 `SHOW MASTER STATUS` 查看 binlog 和 pos，但这代表当前状态，若从库直接用它设置主从，可能会错过部分数据。
+- 正确做法：主从库在执行 `CHANGE MASTER TO` 之前，必须手动执行相同的 `init.sql` 脚本，确保起始数据一致。
+
+### 2. binlog 起始位置不能从0开始？
+
+- MySQL 启动后会生成默认 binlog 文件（如 `mysql-bin.000001`），再执行任何操作都会更新 pos。
+- 即使 `down -v` 后重启，也可能因为初始内部操作（建库建表等）而使 pos 不为 0。
+- 想从最开始记录变化，可以删除 volume 并在 `init.sql` 中控制顺序，提前 `RESET MASTER`。
+
+---
+
+## 四、只读配置问题
+
+### 1. 为什么 `SET GLOBAL super_read_only = ON` 无效？
+
+- 原因：`docker-entrypoint-initdb.d/*.sql` 脚本执行在 MySQL 启动初始化阶段，设置完只读后，脚本自身也没法执行写操作（如创建表）。
+- 所以不能直接在 init.sql 中设置 `super_read_only = ON`。
+
+### 2. 如何正确设置只读？
+
+- 推荐手动进入容器执行：
+  ```sql
+  SET GLOBAL read_only = ON;
+  SET GLOBAL super_read_only = ON;
+  ```
+- `super_read_only` 可以限制 `root` 账号写操作。
+
+---
+
+## 五、MyBatis 无法连接数据库的问题
+
+### 问题排查过程
+
+- 错误信息中提示 `UnknownHostException: db`
+- 最终原因：应用容器的配置中写错了数据库主机名，写成了 `db`，但 compose 中并没有名为 `db` 的服务。
+
+### 正确方式
+
+- `app1` 使用 `mysql-master` 主机名：
+  ```yaml
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-master:3306/ecommerce
   ```
 
-- location 路由设置：
-
-  ```nginx
-  location / {
-      proxy_pass http://ecommerce_backend;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-  }
-
-  location /druid {
-      proxy_pass http://ecommerce_backend;
-  }
+- `app2` 使用 `mysql-slave` 主机名：
+  ```yaml
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-slave:3306/ecommerce
   ```
 
-### 3. nginx.conf 的加载方式
+---
 
-- 最终选择通过 Dockerfile 拷贝配置文件：
+## 六、其他注意事项
 
-  ```dockerfile
-  COPY nginx.conf /etc/nginx/nginx.conf
+- 应用中如果使用 `Druid`，驱动类名 `driver-class-name` 通常可省略，Spring Boot 会自动推断。
+- 主库应确保开启 binlog，并创建 `replica` 用户授权：
+  ```sql
+  CREATE USER 'replica'@'%' IDENTIFIED BY 'yourpassword';
+  GRANT REPLICATION SLAVE ON *.* TO 'replica'@'%';
   ```
 
-- 原因是开发阶段没法直接运行 Nginx，只能通过 Docker 发布，挂载方式依赖本地路径不太适合此场景
-- 挂载适合开发测试，拷贝适合生产部署
+---
 
-## 疑问记录
+## 七、本阶段完成内容
 
-### 为什么 nginx.conf 中 upstream 使用的是 app1:8080 而不是宿主机的 8081？
+- ✅ 主从数据库通过 Docker Compose 部署成功
+- ✅ 数据初始一致性控制
+- ✅ 主库开启 binlog，从库连接并同步
+- ✅ 从库设置只读，防止写入
+- ✅ 应用读写分离部署（app1 写，app2 读）
+- ✅ 整体流程手动验证通过
 
-因为容器内部通信通过容器名进行 DNS 解析，app1 和 app2 是在同一个 Docker 网络中，可以直接访问容器内部端口 8080。
+---
 
-### nginx.conf 中为什么要单独配置 /druid 路径？
-
-location 匹配是精确的，如果没有显式配置 `/druid`，访问 `/druid/index.html` 会返回 404。
-
-### nginx.conf 已配置了 upstream，为何 docker-compose.yml 还需要写 depends_on？
-
-docker-compose 的 `depends_on` 只是确保容器启动顺序，不等同于健康检查。upstream 是 Nginx 配置的一部分，跟 compose 启动顺序无关，但为了避免 Nginx 报错，建议在 nginx 服务中写上依赖项。
-
-### 为什么请求日志没有打印出来？
-
-一开始是因为没有注册拦截器，或者容器中没有 HOSTNAME 环境变量。通过在拦截器中读取环境变量 `System.getenv("HOSTNAME")` 实现。
-
-### hostname 显示的是随机字符串？
-
-容器默认会使用自动生成的 ID 作为 hostname，显示的是该 ID 的前缀。
-
-### 日志在哪里查看？
-
-可以使用命令查看容器日志：
-
-```bash
-docker logs -f ecommerce-app-1
-```
-
-其中 `-f` 表示持续输出（follow 模式）。
-
-### Nginx 转发请求时如何区分实例？
-
-每个请求经过 Nginx，会按照轮询策略转发到 app1 或 app2。可以通过接口返回中包含 `hostname` 来判断请求被哪个实例处理。
-
-### 每次构建是否都需要 docker compose down？
-
-是的，修改了构建参数或配置文件后，为了避免使用旧缓存，推荐执行：
-
-```bash
-docker compose down
-docker compose build
-docker compose up -d
-```
-
-### 为什么我访问 localhost/products/1 报错？
-
-是因为 Redis 连接失败，最终定位是 Redis 地址写死为 localhost，容器内部无法访问。解决方法：
-
-```yaml
-spring:
-  data:
-    redis:
-      host: ${SPRING_REDIS_HOST:localhost}
-      port: ${SPRING_REDIS_PORT:6379}
-```
-
-并在 `docker-compose.yml` 中通过 environment 设置对应的变量，或者直接将 `host` 改为 `ecommerce-redis`。
