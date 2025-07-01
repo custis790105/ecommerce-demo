@@ -8,6 +8,11 @@ spring:
     active: dev
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
+  shardingsphere:
+    enabled: true
+    config:
+      sharding:
+        yaml-location: classpath:sharding.yml
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

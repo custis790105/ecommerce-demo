@@ -10,23 +10,20 @@ services:
       - app1
       - app2
 
-
   app1:
     build: .
     hostname: app1
     container_name: ecommerce-app-1
     depends_on:
-      - mysql-master
-      - mysql-slave
+      - mysql-ds-master
+      - mysql-ds-slave
     ports:
       - "8081:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-master:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: password
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      WORKER_ID: 1
     restart: unless-stopped
 
   app2:
@@ -34,17 +31,15 @@ services:
     hostname: app2
     container_name: ecommerce-app-2
     depends_on:
-      - mysql-master
-      - mysql-slave
+      - mysql-ds-master
+      - mysql-ds-slave
     ports:
       - "8082:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-slave:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: password
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      WORKER_ID: 2
     restart: unless-stopped
 
   redis:
@@ -54,52 +49,54 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-  mysql-master:
+
+  # 分片 ds – Master
+  mysql-ds-master:
     image: mysql:8.0
-    container_name: ecommerce-mysql-master
+    container_name: ecommerce-mysql-ds-master
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ecommerce
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_master_data:/var/lib/mysql
-      - ./mysql-init/master:/docker-entrypoint-initdb.d
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: app_pass
     command: >
-      --server-id=1
+      --server-id=101 #唯一ID
       --log-bin=mysql-bin
       --binlog-format=ROW
       --gtid-mode=ON
       --enforce-gtid-consistency=ON
       --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_ds_master_data:/var/lib/mysql
+      - ./mysql-init/ds-master:/docker-entrypoint-initdb.d
 
-  mysql-slave:
+  # 分片 ds – Slave
+  mysql-ds-slave:
     image: mysql:8.0
-    container_name: ecommerce-mysql-slave
+    container_name: ecommerce-mysql-ds-slave
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ecommerce
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    ports:
-      - "3307:3306"
-    depends_on:
-      - mysql-master
-    volumes:
-      - db_slave_data:/var/lib/mysql
-      - ./mysql-init/slave:/docker-entrypoint-initdb.d
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: app_pass
     command: >
-      --server-id=2
+      --server-id=102  # 与master不同
       --relay-log=relay-log
       --log-bin=mysql-bin
       --read-only=1
       --gtid-mode=ON
       --enforce-gtid-consistency=ON
       --default-authentication-plugin=mysql_native_password
-    
+    depends_on:
+      - mysql-ds-master
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_ds_slave_data:/var/lib/mysql
+      - ./mysql-init/ds-slave:/docker-entrypoint-initdb.d
 
 volumes:
-  db_master_data:
-  db_slave_data:
+  db_ds_master_data:
+  db_ds_slave_data:

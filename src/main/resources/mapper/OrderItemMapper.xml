@@ -5,7 +5,7 @@
 
 <mapper namespace="com.example.ecommerce.mapper.OrderItemMapper">
     <insert id="insertOrderItem" parameterType="com.example.ecommerce.model.OrderItem">
-        insert into order_item(id,order_id,product_id,quantity,price)
-        values(#{id},#{orderId},#{productId},#{quantity},#{price})
+        insert into order_item(order_id,product_id,quantity,price)
+        values(#{orderId},#{productId},#{quantity},#{price})
     </insert>
 </mapper>
