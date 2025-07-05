@@ -53,20 +53,21 @@ public class OrderServiceImpl implements OrderService{
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setTotalPrice(totalPrice);
         order.setCreatedAt(LocalDateTime.now());
+        order.setUserId(orderRequest.getUserId());
         order.setCustomerName(orderRequest.getCustomerName());
         order.setCustomerEmail(orderRequest.getCustomerEmail());
 
         // Save order to database
         orderMapper.insertOrder(order);
-        Integer orderId = order.getId();
+        Long orderId = order.getId();
 
         // Save order items and update product stock
-        List<Integer> productIds = orderItemRequestList.stream()
+        List<Long> productIds = orderItemRequestList.stream()
                 .map(OrderItemRequest::getProductId)
                 .distinct()
                 .collect(Collectors.toList());
         List<Product> productList = productMapper.getProductByIdsForUpdate(productIds);
-        Map<Integer, Product> productMap = productList.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
+        Map<Long, Product> productMap = productList.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
 
         List<OrderItem> orderItems = new ArrayList<>();
         for (OrderItemRequest item : orderItemRequestList) {
@@ -80,6 +81,7 @@ public class OrderServiceImpl implements OrderService{
             }
 
             OrderItem orderItem = new OrderItem();
+            orderItem.setUserId(order.getUserId());
             orderItem.setOrderId(orderId);
             orderItem.setProductId(item.getProductId());
             orderItem.setPrice(item.getPrice());

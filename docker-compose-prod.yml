@@ -17,6 +17,7 @@ services:
     depends_on:
       - mysql-ds-master
       - mysql-ds-slave
+      - redis
     ports:
       - "8081:8080"
     environment:
@@ -33,6 +34,7 @@ services:
     depends_on:
       - mysql-ds-master
       - mysql-ds-slave
+      - redis
     ports:
       - "8082:8080"
     environment:
@@ -60,7 +62,7 @@ services:
       MYSQL_USER: app_user
       MYSQL_PASSWORD: app_pass
     command: >
-      --server-id=101 #唯一ID
+      --server-id=101
       --log-bin=mysql-bin
       --binlog-format=ROW
       --gtid-mode=ON
@@ -82,7 +84,7 @@ services:
       MYSQL_USER: app_user
       MYSQL_PASSWORD: app_pass
     command: >
-      --server-id=102  # 与master不同
+      --server-id=102
       --relay-log=relay-log
       --log-bin=mysql-bin
       --read-only=1

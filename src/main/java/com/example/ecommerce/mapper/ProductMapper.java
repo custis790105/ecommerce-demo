@@ -13,9 +13,9 @@ public interface ProductMapper {
 
     Product findById(@Param("id") Long id);
 
-    List<Product> getProductByIdsForUpdate(List<Integer> ids);
+    List<Product> getProductByIdsForUpdate(List<Long> ids);
 
-    void updateStock(@Param("quantity") Integer quantity, @Param("productId") Integer productID);
+    void updateStock(@Param("quantity") Integer quantity, @Param("productId") Long productID);
 
     void batchUpdateStock(@Param("items") List<OrderItem> items);
 }

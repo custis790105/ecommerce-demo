@@ -3,33 +3,42 @@ package com.example.ecommerce.model;
 import java.math.BigDecimal;
 
 public class OrderItem {
-    private Integer id;
-    private Integer orderId;
-    private Integer productId;
+    private Long id;
+    private Long userId;
+    private Long orderId;
+    private Long productId;
     private Integer quantity;
     private BigDecimal price;
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public Integer getOrderId() {
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public Long getOrderId() {
         return orderId;
     }
 
-    public void setOrderId(Integer orderId) {
+    public void setOrderId(Long orderId) {
         this.orderId = orderId;
     }
 
-    public Integer getProductId() {
+    public Long getProductId() {
         return productId;
     }
 
-    public void setProductId(Integer productId) {
+    public void setProductId(Long productId) {
         this.productId = productId;
     }
 

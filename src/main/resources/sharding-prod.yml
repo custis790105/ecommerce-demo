@@ -1,0 +1,161 @@
+##############################################################################
+# sharding-prod.yml  （Druid 连接池 + 分库分表 + product 单表读写分离）
+##############################################################################
+
+#####################################################
+# 1️⃣  数据源
+#####################################################
+dataSources:
+  ds0_master:
+    dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql-ds-master:3306/ds0?serverTimezone=UTC&useSSL=false
+    username: app_user
+    password: app_pass
+    initialSize: 5          # 连接池初始化大小
+    maxActive: 20           # 最大活跃连接数（≈ Hikari maximumPoolSize）
+    minIdle: 5              # 最小空闲连接数
+    validationQuery: SELECT 1
+
+  ds0_slave:
+    dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql-ds-slave:3306/ds0?serverTimezone=UTC&useSSL=false
+    username: app_user
+    password: app_pass
+    initialSize: 5
+    maxActive: 20
+    minIdle: 5
+    validationQuery: SELECT 1
+
+  ds1_master:
+    dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql-ds-master:3306/ds1?serverTimezone=UTC&useSSL=false
+    username: app_user
+    password: app_pass
+    initialSize: 5
+    maxActive: 20
+    minIdle: 5
+    validationQuery: SELECT 1
+
+  ds1_slave:
+    dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql-ds-slave:3306/ds1?serverTimezone=UTC&useSSL=false
+    username: app_user
+    password: app_pass
+    initialSize: 5
+    maxActive: 20
+    minIdle: 5
+    validationQuery: SELECT 1
+
+  product_master:
+    dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql-ds-master:3306/product_db?serverTimezone=UTC&useSSL=false
+    username: app_user
+    password: app_pass
+    initialSize: 5
+    maxActive: 20
+    minIdle: 5
+    validationQuery: SELECT 1
+
+  product_slave:
+    dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql-ds-slave:3306/product_db?serverTimezone=UTC&useSSL=false
+    username: app_user
+    password: app_pass
+    initialSize: 5
+    maxActive: 20
+    minIdle: 5
+    validationQuery: SELECT 1
+
+#####################################################
+# 2️⃣  读写分离
+#####################################################
+rules:
+  - !READWRITE_SPLITTING
+    dataSources:
+      ds0:
+        staticStrategy:
+          writeDataSourceName: ds0_master
+          readDataSourceNames: [ ds0_slave ]
+      ds1:
+        staticStrategy:
+          writeDataSourceName: ds1_master
+          readDataSourceNames: [ ds1_slave ]
+      product:
+        staticStrategy:
+          writeDataSourceName: product_master
+          readDataSourceNames: [ product_slave ]
+
+  #####################################################
+  # 3️⃣  分库 / 分表
+  #####################################################
+  - !SHARDING
+    tables:
+      order:
+        actualDataNodes: ds$->{0..1}.order_$->{0..1}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: order_id
+            shardingAlgorithmName: order_table_inline
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      order_item:
+        actualDataNodes: ds$->{0..1}.order_item_$->{0..1}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: order_id
+            shardingAlgorithmName: order_item_table_inline
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+    bindingTables:
+      - order, order_item
+
+    shardingAlgorithms:
+      db_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds$->{user_id % 2}
+      order_table_inline:
+        type: INLINE
+        props:
+          algorithm-expression: order_$->{order_id % 2}
+      order_item_table_inline:
+        type: INLINE
+        props:
+          algorithm-expression: order_item_$->{order_id % 2}
+
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: ${WORKER_ID:1}
+
+  #####################################################
+  # 4️⃣  单表（所有没写规则的表 → 走 product 逻辑库）
+  #####################################################
+  - !SINGLE
+    defaultDataSource: product
+
+#####################################################
+# 5️⃣  全局属性
+#####################################################
+props:
+  sql-show: true
+  check-table-metadata-enabled: false

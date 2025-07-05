@@ -5,18 +5,10 @@ spring:
   application:
     name: ecommerce-demo
   profiles:
-    active: dev
-  datasource:
-    type: com.alibaba.druid.pool.DruidDataSource
-  shardingsphere:
-    enabled: true
-    config:
-      sharding:
-        yaml-location: classpath:sharding.yml
+    active: prod
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.example.ecommerce.model
   configuration:
     map-underscore-to-camel-case: true
-
