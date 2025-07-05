@@ -24,7 +24,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
-      WORKER_ID: 1
+#      JAVA_TOOL_OPTIONS: "-DWORKER_ID=1"
     restart: unless-stopped
 
   app2:
@@ -41,7 +41,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
-      WORKER_ID: 2
+#      JAVA_TOOL_OPTIONS: "-DWORKER_ID=2"
     restart: unless-stopped
 
   redis:

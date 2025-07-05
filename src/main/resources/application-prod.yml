@@ -1,7 +1,7 @@
 spring:
   datasource:
-    url: jdbc:dummy      # 占位，不再用 shardingsphere driver
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:sharding-prod.yml
 
   # Redis
   data:
