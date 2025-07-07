@@ -12,7 +12,7 @@ dataSources:
   ds0_master:
     dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql-ds-master:3306/ds0?serverTimezone=UTC&useSSL=false
+    url: jdbc:mysql://localhost:3306/ds0?serverTimezone=UTC&useSSL=false
     username: app_user
     password: app_pass
     initialSize: 5          # 连接池初始化大小
@@ -23,7 +23,7 @@ dataSources:
   ds0_slave:
     dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql-ds-slave:3306/ds0?serverTimezone=UTC&useSSL=false
+    url: jdbc:mysql://localhost:3306/ds0?serverTimezone=UTC&useSSL=false
     username: app_user
     password: app_pass
     initialSize: 5
@@ -34,7 +34,7 @@ dataSources:
   ds1_master:
     dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql-ds-master:3306/ds1?serverTimezone=UTC&useSSL=false
+    url: jdbc:mysql://localhost:3306/ds1?serverTimezone=UTC&useSSL=false
     username: app_user
     password: app_pass
     initialSize: 5
@@ -45,7 +45,7 @@ dataSources:
   ds1_slave:
     dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql-ds-slave:3306/ds1?serverTimezone=UTC&useSSL=false
+    url: jdbc:mysql://localhost:3306/ds1?serverTimezone=UTC&useSSL=false
     username: app_user
     password: app_pass
     initialSize: 5
@@ -56,7 +56,7 @@ dataSources:
   product_master:
     dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql-ds-master:3306/product_db?serverTimezone=UTC&useSSL=false
+    url: jdbc:mysql://localhost:3306/product_db?serverTimezone=UTC&useSSL=false
     username: app_user
     password: app_pass
     initialSize: 5
@@ -67,7 +67,7 @@ dataSources:
   product_slave:
     dataSourceClassName: com.alibaba.druid.pool.DruidDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://mysql-ds-slave:3306/product_db?serverTimezone=UTC&useSSL=false
+    url: jdbc:mysql://localhost:3306/product_db?serverTimezone=UTC&useSSL=false
     username: app_user
     password: app_pass
     initialSize: 5

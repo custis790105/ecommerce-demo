@@ -50,12 +50,12 @@ CREATE TABLE IF NOT EXISTS order_0 (
 CREATE TABLE IF NOT EXISTS order_1 LIKE order_0;
 
 CREATE TABLE IF NOT EXISTS order_item_0 (
-  id BIGINT PRIMARY KEY,
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL, -- ← 同样保留分片键
-  order_id   BIGINT NOT NULL,
+  order_id BIGINT NOT NULL,
   product_id BIGINT NOT NULL,
-  quantity   INT    NOT NULL,
-  price      DECIMAL(10,2) NOT NULL
+  quantity INT NOT NULL,
+  price DECIMAL(10,2) NOT NULL
 );
 CREATE TABLE IF NOT EXISTS order_item_1 LIKE order_item_0;
 

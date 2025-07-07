@@ -1,95 +1,114 @@
-# 第五阶段：MySQL 主从复制总结（stage-05-db-readwrite-split）
+# 第六阶段：Sharding-JDBC 分库分表
 
-## 一、目标
-
-本阶段目标是通过 MySQL 主从配置，实现数据库的读写分离，为后续分库分表打下基础。
+本阶段目标是使用 Sharding-JDBC 实现按 `user_id` 进行分库、按 `order_id` 进行分表的读写分离架构。
 
 ---
 
-## 二、实现方案
+## 🎯 项目结构与目标
 
-### 1. 架构简述
-
-- 使用 Docker Compose 启动 `mysql-master` 和 `mysql-slave`
-- `app1` 连接主库，处理写请求
-- `app2` 连接从库，处理读请求
-- 从库通过 `CHANGE MASTER TO` 命令手动配置复制
-
----
-
-## 三、配置细节
-
-### 1. 初始化同步的一致性问题
-
-- 问题：主库通过 `SHOW MASTER STATUS` 查看 binlog 和 pos，但这代表当前状态，若从库直接用它设置主从，可能会错过部分数据。
-- 正确做法：主从库在执行 `CHANGE MASTER TO` 之前，必须手动执行相同的 `init.sql` 脚本，确保起始数据一致。
-
-### 2. binlog 起始位置不能从0开始？
-
-- MySQL 启动后会生成默认 binlog 文件（如 `mysql-bin.000001`），再执行任何操作都会更新 pos。
-- 即使 `down -v` 后重启，也可能因为初始内部操作（建库建表等）而使 pos 不为 0。
-- 想从最开始记录变化，可以删除 volume 并在 `init.sql` 中控制顺序，提前 `RESET MASTER`。
+- 以 `order` 为主表，按 `user_id` 分库（`ds0`, `ds1`）
+- `order` 表按 `id` 分表（`order_0`, `order_1`）
+- `order_item` 表跟随 `order` 表按 `order_id` 分表（`order_item_0`, `order_item_1`）
+- 读写分离架构保留（与第五阶段兼容）
+- 使用雪花算法自动生成全局唯一主键
+- 开发环境与部署环境保持一致的配置方式，实现代码不变即可切换运行环境
 
 ---
 
-## 四、只读配置问题
+## ⚙️ 配置说明（sharding-prod.yml / sharding-dev.yml）
 
-### 1. 为什么 `SET GLOBAL super_read_only = ON` 无效？
+### 1. 数据源配置
 
-- 原因：`docker-entrypoint-initdb.d/*.sql` 脚本执行在 MySQL 启动初始化阶段，设置完只读后，脚本自身也没法执行写操作（如创建表）。
-- 所以不能直接在 init.sql 中设置 `super_read_only = ON`。
+```yaml
+dataSources:
+  ds0:
+    url: jdbc:mysql://mysql-ds0-master:3306/ecommerce_ds0...
+  ds1:
+    url: jdbc:mysql://mysql-ds1-master:3306/ecommerce_ds1...
+```
 
-### 2. 如何正确设置只读？
+两个主库组成的分库结构，配合读写分离中配置的主从数据源名（ds0, ds1）。
 
-- 推荐手动进入容器执行：
-  ```sql
-  SET GLOBAL read_only = ON;
-  SET GLOBAL super_read_only = ON;
-  ```
-- `super_read_only` 可以限制 `root` 账号写操作。
+### 2. 分库策略
+
+```yaml
+shardingAlgorithms:
+  db_inline:
+    type: INLINE
+    props:
+      algorithm-expression: ds${user_id % 2}
+```
+
+按 `user_id` 路由到 `ds0` 或 `ds1`。
+
+### 3. 分表策略
+
+```yaml
+shardingAlgorithms:
+  order_table_inline:
+    type: INLINE
+    props:
+      algorithm-expression: order_${id % 2}
+
+  order_item_table_inline:
+    type: INLINE
+    props:
+      algorithm-expression: order_item_${order_id % 2}
+```
+
+说明：
+
+- `order.id` 作为主键路由规则（必须能取到该值）
+- `order_item.order_id` 作为从表路由规则
+- 注意：算法表达式中不能含空格，必须符合 `${}` 语法
 
 ---
 
-## 五、MyBatis 无法连接数据库的问题
+## 🧠 遇到的问题与排查记录
 
-### 问题排查过程
+### ✅ 成功解决的问题
 
-- 错误信息中提示 `UnknownHostException: db`
-- 最终原因：应用容器的配置中写错了数据库主机名，写成了 `db`，但 compose 中并没有名为 `db` 的服务。
+| 问题 | 原因分析 | 解决方案 |
+|------|-----------|------------|
+| `order_item_${order_id%2}` 报错表达式与分片键不匹配 | 分片键在 SQL 中无法正确识别 | `insert` 时未设置 `useGeneratedKeys` 导致主键为空 |
+| 本地无法调试 | 配置文件仅适用于容器环境，主机名无法解析 | 复制 `sharding-prod.yml` 为 `sharding-dev.yml`，将连接改为 `localhost` |
+| IDE 启动访问数据库失败 | 容器内数据库名 `mysql-ds-master` 在宿主机中无法解析 | 本地调试用 `localhost` 替换数据库连接配置 |
 
-### 正确方式
+---
 
-- `app1` 使用 `mysql-master` 主机名：
+## 💡 注意事项与经验总结
+
+1. Sharding-JDBC 表达式写法不要带空格，如 `order_${id % 2}`。
+2. 一定确保 insert 时主键字段有值，否则分表表达式取不到值。
+3. 如果使用雪花算法生成主键，MyBatis 依然要配置 `useGeneratedKeys="true" keyProperty="id"`。
+4. `order_id` 在 `order` 表中叫 `id`，在 `order_item` 中叫 `order_id`，表达式要匹配实体类字段名。
+5. 本地开发可以通过 `sharding-dev.yml` + 修改数据库连接为 `localhost` 的方式实现调试，不需要换配置结构。
+
+---
+
+## 🛠 本地与容器联调建议
+
+- Docker容器启动时暴露端口：
   ```yaml
-  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-master:3306/ecommerce
+  ports:
+    - 3306:3306
+    - 6379:6379
   ```
-
-- `app2` 使用 `mysql-slave` 主机名：
+- `application-dev.yml` 中：
   ```yaml
-  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-slave:3306/ecommerce
+  spring:
+    datasource:
+      url: jdbc:shardingsphere:classpath:sharding-dev.yml
+    redis:
+      host: localhost
   ```
 
----
-
-## 六、其他注意事项
-
-- 应用中如果使用 `Druid`，驱动类名 `driver-class-name` 通常可省略，Spring Boot 会自动推断。
-- 主库应确保开启 binlog，并创建 `replica` 用户授权：
-  ```sql
-  CREATE USER 'replica'@'%' IDENTIFIED BY 'yourpassword';
-  GRANT REPLICATION SLAVE ON *.* TO 'replica'@'%';
-  ```
+确保容器 MySQL、Redis 服务的端口映射正确，开发环境配置本地连接即可。
 
 ---
 
-## 七、本阶段完成内容
+## ✅ 阶段结论
 
-- ✅ 主从数据库通过 Docker Compose 部署成功
-- ✅ 数据初始一致性控制
-- ✅ 主库开启 binlog，从库连接并同步
-- ✅ 从库设置只读，防止写入
-- ✅ 应用读写分离部署（app1 写，app2 读）
-- ✅ 整体流程手动验证通过
-
----
-
+- ✅ 实现了按 user_id 分库、order_id 分表的完整策略
+- ✅ 开发与部署配置统一，调试与部署互不影响
+- ✅ 解决了生成主键为空、配置模式报错等关键问题
