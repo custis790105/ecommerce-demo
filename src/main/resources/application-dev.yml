@@ -8,6 +8,13 @@ spring:
       host: localhost
       port: 6379
 
+  rabbitmq:
+    virtual-host: /
+    host: localhost
+    port: 5672
+    username: mq_user
+    password: mq_password
+
 mybatis:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
