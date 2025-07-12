@@ -10,6 +10,7 @@ public class Order {
     private String customerEmail;
     private BigDecimal totalPrice;
     private LocalDateTime createdAt;
+    private String status;
 
     public Long getId() {
         return id;
@@ -57,5 +58,13 @@ public class Order {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

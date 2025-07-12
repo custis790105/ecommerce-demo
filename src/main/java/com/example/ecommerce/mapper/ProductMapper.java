@@ -1,5 +1,6 @@
 package com.example.ecommerce.mapper;
 
+import com.example.ecommerce.message.OrderItemMessage;
 import com.example.ecommerce.model.OrderItem;
 import com.example.ecommerce.model.Product;
 import org.apache.ibatis.annotations.Mapper;
@@ -17,5 +18,5 @@ public interface ProductMapper {
 
     void updateStock(@Param("quantity") Integer quantity, @Param("productId") Long productID);
 
-    void batchUpdateStock(@Param("items") List<OrderItem> items);
+    int batchUpdateStock(@Param("items") List<OrderItemMessage> items);
 }

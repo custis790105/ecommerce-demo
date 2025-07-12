@@ -5,7 +5,10 @@
 
 <mapper namespace="com.example.ecommerce.mapper.OrderMapper">
     <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id" parameterType="com.example.ecommerce.model.Order">
-        insert into `order`(user_id,customer_name,customer_email,total_price,created_at)
-        values(#{userId},#{customerName},#{customerEmail},#{totalPrice},#{createdAt})
+        insert into `order`(user_id,customer_name,customer_email,total_price,created_at,status)
+        values(#{userId},#{customerName},#{customerEmail},#{totalPrice},#{createdAt},#{status})
     </insert>
+    <update id="updateOrderStatus">
+        update `order` set status = #{status} where id = #{orderId}
+    </update>
 </mapper>

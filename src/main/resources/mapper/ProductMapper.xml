@@ -28,6 +28,11 @@
         <foreach collection="items" item="item" open="(" separator="," close=")">
             #{item.productId}
         </foreach>
+        AND (
+        <foreach collection="items" item="item" separator=" OR ">
+            (id = #{item.productId} AND stock >= #{item.quantity})
+        </foreach>
+        )
     </update>
 
     <select id="getProductByIdsForUpdate" parameterType="List" resultType="com.example.ecommerce.model.Product">
