@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.ecommerce.stock.mapper.ProductMapper">
+    <select id="findAll" resultType="com.example.ecommerce.model.Product">
+        select * from product
+    </select>
+
+    <select id="findById" resultType="com.example.ecommerce.model.Product">
+        select * from product where id = #{id}
+    </select>
+
+    <update id="updateStock">
+        update product set stock = stock - #{quantity}
+        where id = #{productId} and stock >= #{quantity}
+    </update>
+
+    <update id="batchUpdateStock">
+        UPDATE product
+        SET stock = stock - CASE id
+        <foreach collection="items" item="item">
+            WHEN #{item.productId} THEN #{item.quantity}
+        </foreach>
+        END
+        WHERE id IN
+        <foreach collection="items" item="item" open="(" separator="," close=")">
+            #{item.productId}
+        </foreach>
+        AND (
+        <foreach collection="items" item="item" separator=" OR ">
+            (id = #{item.productId} AND stock >= #{item.quantity})
+        </foreach>
+        )
+    </update>
+
+    <select id="getProductByIdsForUpdate" parameterType="List" resultType="com.example.ecommerce.model.Product">
+        select * from product where id in
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+        #{id}
+        </foreach>
+        for update
+    </select>
+</mapper> 
